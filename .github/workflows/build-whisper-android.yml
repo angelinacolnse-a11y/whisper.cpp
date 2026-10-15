@@ -1,0 +1,49 @@
+
+name: Build Whisper Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout whisper.cpp
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Download multilingual Whisper Base
+        run: |
+          mkdir -p examples/whisper.android/app/src/main/assets/models
+          curl -fL --retry 3 \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" \
+            -o examples/whisper.android/app/src/main/assets/models/ggml-base.bin
+          test $(stat -c%s examples/whisper.android/app/src/main/assets/models/ggml-base.bin) -gt 100000000
+
+      - name: Build Android debug APK
+        working-directory: examples/whisper.android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Whisper-Base-Android-Test
+          path: examples/whisper.android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
